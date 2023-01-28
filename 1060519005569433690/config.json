@@ -1,0 +1,9 @@
+{
+    "reddit" : {
+        "client_id" : "",
+        "client_secret" : "",
+        "user_agent" : ""
+    },
+    "discord_token" : "",
+    "db_location" : ""
+}

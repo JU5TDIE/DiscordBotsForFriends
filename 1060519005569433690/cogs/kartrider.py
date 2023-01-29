@@ -20,9 +20,9 @@ def kart_schedule_embed():
         if date == now:
             schedule = f'**`{schedule}`**'
         elif date < now:
-            schedule = f'~~`{schedule}`~~'
+            schedule = f'~~`{schedule}`~~ (<t:{int(datetime.datetime.timestamp(date))}:R>)'
         elif date > now:
-            schedule = f'`{schedule}`'
+            schedule = f'`{schedule}` (<t:{int(datetime.datetime.timestamp(date))}:R>)'
         schedules[index] = schedule
     embedVar = discord.Embed(title='카트라이더 서비스 종료 일정', description='\n'.join(schedules))
     embedVar.set_image(url='attachment://the_end.png')
@@ -31,6 +31,10 @@ def kart_schedule_embed():
 class KartRider(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        print('Kartrider is ready')
 
     kart = app_commands.Group(name='kart', description='kartrider 2004-2023 rip')
     

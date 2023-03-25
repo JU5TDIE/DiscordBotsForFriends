@@ -25,9 +25,6 @@ class Bot(commands.Bot):
         print(f'Guilds : {len(self.guilds)}')
         print('──────────────────────────────────────────')
 
-with open('config.json', encoding='utf-8') as f:
-    config = json.load(f)
-
 if __name__ == '__main__':
     with open('config.json', 'r') as f:
         config = json.load(f)

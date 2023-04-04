@@ -1,6 +1,9 @@
+import aiohttp
 import random
 import discord
 import datetime
+import json
+import zipfile
 from discord.ext import commands
 from discord import app_commands
 
@@ -32,14 +35,14 @@ letter = '''
 카트라이더 개발팀 드림
 '''
 
-def kart_embed():
+def kartrider_the_end_embed():
     quotes = ["“Goodbyes make you think. They make you realize what you’ve had, what you’ve lost, and what you’ve taken for granted.”", "“The story of life is quicker than the wink of an eye, the story of love is hello and goodbye, until we meet again.”", "If you're brave enough to say goodbye, life will reward you with a new hello.", "Don't cry because it's over. Smile because it happened."]
     embedVar = discord.Embed(title='RIP Kartrider (2004-2023)')
     embedVar.set_image(url='attachment://rip_kartrider.png')
     embedVar.set_footer(text=f"{random.choice(quotes)} Farewell, Kartrider")
     return embedVar
 
-def kart_schedule_embed():
+def kartrider_schedule_embed():
     schedules = ['2023.01.06 > 결제 서비스 종료', '2023.01.12 > 카트라이더 드림(Dream) 프로젝트 페이지 오픈', '2023.02.01 > 카트라이더 환불 신청 페이지 오픈', '2023.03.31 > 카트라이더 서비스 종료']
     kst = datetime.datetime.utcnow() + datetime.timedelta(hours=9)
     now = kst.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -56,32 +59,85 @@ def kart_schedule_embed():
     embedVar.set_image(url='attachment://the_end.png')
     return embedVar
 
+def kartrider_kart_embed(item):
+    embedVar = discord.Embed(title=item['name'])
+    embedVar.set_image(url=f"attachment://{item['id']}.png")
+    return embedVar
+
+async def get_metadata():
+    async with aiohttp.ClientSession() as session:
+        async with session.get('https://static.api.nexon.co.kr/kart/latest/metadata.zip') as response:
+            if response.status == 200:
+                with open('metadata.zip', "wb") as f:
+                    f.write(await response.read())
+            else:
+                print(f'Error: {response.status}')
+
 class KartRider(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
 
     @commands.Cog.listener()
     async def on_ready(self):
+        self.metadata = {}
+        if not zipfile.is_zipfile('metadata.zip'):
+            await get_metadata()
+        with zipfile.ZipFile('metadata.zip', 'r') as z:
+            for filename in z.namelist():
+                if filename.endswith('.json') and filename not in ['gameType.json', 'flyingPet.json', 'pet.json']: # TODO remove these json files if they are ready
+                    with z.open(filename) as f:
+                        self.metadata[filename.split('.json')[0]] = json.loads(f.read().decode('utf-8'))
         print('Kartrider is ready')
 
-    kart = app_commands.Group(name='kart', description='kartrider 2004-2023 rip')
+    kartrider = app_commands.Group(name='kartrider', description='kartrider 2004-2023 rip')
     
-    @kart.command(description='The End')
+    @kartrider.command(description='The End')
     async def end(self, interaction: discord.Interaction):
         file = discord.File('./attachments/IMG_4644.jpg', filename='rip_kartrider.png')
-        await interaction.response.send_message(file=file, embed=kart_embed())
+        await interaction.response.send_message(file=file, embed=kartrider_the_end_embed())
 
-    @kart.command(description='카트라이더 서비스 종료 일정')
+    @kartrider.command(description='카트라이더 서비스 종료 일정')
     async def schedule(self, interaction: discord.Interaction):
         file = discord.File('./attachments/IMG_4647.jpg', filename='the_end.png')
-        await interaction.response.send_message(file=file, embed=kart_schedule_embed())
+        await interaction.response.send_message(file=file, embed=kartrider_schedule_embed())
 
-    @kart.command(description='카트라이더 마지막 편지')
+    @kartrider.command(description='카트라이더 마지막 편지')
     async def letter(self, interaction: discord.Interaction):
         file = discord.File('./attachments/6940049224801243763.jpg', filename='letter.png')
         embedVar = discord.Embed(description=letter)
         embedVar.set_image(url='attachment://letter.png')
         await interaction.response.send_message(file=file, embed=embedVar)
+
+    @kartrider.command(description='카트라이더 메타데이터 검색')
+    @app_commands.rename(search_type='type')
+    @app_commands.rename(search_name='name')
+    async def search(self, interaction: discord.Interaction, search_type: str, search_name: str):
+        if not search_type in self.metadata.keys():
+            raise 
+        if not [item for item in self.metadata[search_type] if item['name'] == search_name]:
+            raise
+        item = next(item for item in self.metadata[search_type] if item['name'] == search_name)
+        with zipfile.ZipFile('metadata.zip', 'r') as z:
+            try:
+                with z.open(f"{search_type}/{item['id']}.png") as f:
+                    file = discord.File(f, filename=f"{item['id']}.png")
+            except KeyError: # image not found
+                file = discord.File('./attachments/invisible.png', filename=f"{item['id']}.png")
+        await interaction.response.send_message(file=file, embed=kartrider_kart_embed(item))
+
+    @search.autocomplete('search_type')
+    async def search_type_autocomplete(self, interaction: discord.Interaction, current: str):
+        return [app_commands.Choice(name=data_type, value=data_type) for data_type in self.metadata.keys()]
+
+    @search.autocomplete('search_name')
+    async def search_name_autocomplete(self, interaction: discord.Interaction, current: str):
+        if interaction.namespace.type and self.metadata.get(interaction.namespace.type):
+            return [
+                app_commands.Choice(name=item['name'], value=item['name'])
+                for item in self.metadata[interaction.namespace.type] if current.lower() in item['name'].lower()
+            ][:25]
+        else:
+            return []
 
 async def setup(client):
 	await client.add_cog(KartRider(client))

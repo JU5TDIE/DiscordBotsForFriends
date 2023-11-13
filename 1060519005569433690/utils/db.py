@@ -5,7 +5,7 @@ from async_class import AsyncObject
 
 class aioDbLite(AsyncObject):
     async def __ainit__(self, db_name):
-        self.conn = await aiosqlite.connect(db_name)
+        self.conn = await aiosqlite.connect(f'data/{db_name}')
         self.cursor = await self.conn.cursor()
 
     async def create(self, table_name, **kwargs):

@@ -28,8 +28,11 @@ class RedditFeed(commands.Cog):
 
     async def fetch_subreddit_top_post(self, subreddit_name: str):
         subreddit: Subreddit = await self.client.reddit.subreddit(subreddit_name)
-        async for post in subreddit.top(limit=1, time_filter='day'):
-            return [subreddit, post]
+        try:
+            async for post in subreddit.top(limit=1, time_filter='day'):
+                return [subreddit, post]
+        except asyncprawcore.exceptions.Forbidden:
+            pass
         
     @commands.Cog.listener()
     async def on_ready(self):
@@ -41,9 +44,10 @@ class RedditFeed(commands.Cog):
 
     @feed.command(description='Show top post from each subscribed subreddits')
     async def show(self, interaction: discord.Interaction):
+        await interaction.response.send_message(content=f"Loading feed...")
         subreddits = await self.fetch_subscribed_subreddits(interaction.user.id)
         if not subreddits: # empty feed
-            return await interaction.response.send_message(content="Your feed is empty. Use **/feed add** command to fill your empty feed", ephemeral=True)
+            return await interaction.edit_original_response(content="Your feed is empty. Use **/feed add** command to fill your empty feed")
         tasks = [self.fetch_subreddit_top_post(subreddit) for subreddit in subreddits]
         posts = await asyncio.gather(*tasks)
         feed_embed = default_feed(interaction.user)
@@ -51,7 +55,7 @@ class RedditFeed(commands.Cog):
             subreddit = post[0]
             post = post[1]
             feed_embed.add_field(name=f'{subreddit.display_name}', value=f'[{post.title}](https://www.reddit.com{post.permalink})', inline=False)
-        await interaction.response.send_message(embed=feed_embed)
+        await interaction.edit_original_response(content="", embed=feed_embed)
             
     @feed.command(description='Add subreddit to feed')
     async def add(self, interaction: discord.Interaction, subreddit_name: str):
